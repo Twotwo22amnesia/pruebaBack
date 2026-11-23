@@ -5,6 +5,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- Aplica coverage.runsettings en cualquier "dotnet test", sin tener que pasar
+         settings: así la cobertura siempre excluye el código generado de las migraciones. -->
+    <RunSettingsFilePath>$(MSBuildThisFileDirectory)..\..\coverage.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
   <ItemGroup>

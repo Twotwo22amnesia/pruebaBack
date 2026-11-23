@@ -117,16 +117,18 @@ docker compose --profile tests run --rm tests
 ### Cobertura
 
 ```bash
-dotnet test --settings coverage.runsettings --collect "XPlat Code Coverage" --results-directory TestResults
+dotnet test --collect "XPlat Code Coverage" --results-directory TestResults
 dotnet tool restore
 dotnet reportgenerator -reports:"TestResults/*/coverage.cobertura.xml" -targetdir:coverage-report -reporttypes:"Html;TextSummary"
 ```
 
-El reporte queda en `coverage-report/index.html`. Cobertura actual: **95,6 % de líneas**
-(objetivo mínimo: 70 %).
+El reporte queda en `coverage-report/index.html`. Cobertura actual: **95,8 % de líneas**
+y 80 % de ramas (objetivo mínimo: 70 %).
 
 Las migraciones se excluyen del cálculo porque las genera `dotnet ef` y no contienen
-lógica propia.
+lógica propia. La exclusión está en `coverage.runsettings`, que el proyecto de pruebas
+aplica automáticamente (`RunSettingsFilePath`), por lo que no hace falta indicarlo al
+ejecutar `dotnet test`.
 
 ## Decisiones de diseño
 

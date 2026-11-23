@@ -1,4 +1,5 @@
 using MarcasAutos.Api.Data;
+using MarcasAutos.Api.Services;
 using Microsoft.EntityFrameworkCore;
 using Scalar.AspNetCore;
 
@@ -13,6 +14,9 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, npgsql =>
         // Reintentos ante fallos transitorios (p. ej. si Postgres aún está arrancando).
         npgsql.EnableRetryOnFailure(maxRetryCount: 5)));
+
+// Scoped, igual que el DbContext: una instancia por petición HTTP.
+builder.Services.AddScoped<IMarcasAutosService, MarcasAutosService>();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();

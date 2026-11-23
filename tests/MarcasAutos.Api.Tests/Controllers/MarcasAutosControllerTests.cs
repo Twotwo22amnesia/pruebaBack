@@ -1,88 +1,78 @@
 using MarcasAutos.Api.Controllers;
 using MarcasAutos.Api.Data;
 using MarcasAutos.Api.Dtos;
-using MarcasAutos.Api.Models;
+using MarcasAutos.Api.Services;
 using MarcasAutos.Api.Tests.Helpers;
 using Microsoft.AspNetCore.Mvc;
+using NSubstitute;
 
 namespace MarcasAutos.Api.Tests.Controllers;
 
 /// <summary>
-/// Pruebas unitarias del controlador usando un contexto en memoria.
-/// Se instancia el controlador directamente, sin levantar el servidor HTTP.
+/// Pruebas unitarias del controlador. Se instancia directamente, sin levantar el servidor HTTP.
 /// </summary>
 public class MarcasAutosControllerTests
 {
     [Fact]
-    public async Task GetAll_ConDatosIniciales_RetornaOkConTodasLasMarcas()
+    public async Task GetAll_ConContextoEnMemoria_RetornaOkConLasMarcasDelSeed()
     {
+        // Controlador + servicio real sobre la base en memoria: verifica que el endpoint
+        // devuelve los datos esperados de punta a punta, sin PostgreSQL.
         await using var context = InMemoryDbContextFactory.Crear();
-        var controller = new MarcasAutosController(context);
-
-        var resultado = await controller.GetAll(CancellationToken.None);
-
-        var ok = Assert.IsType<OkObjectResult>(resultado.Result);
-        var marcas = Assert.IsAssignableFrom<IEnumerable<MarcaAutoDto>>(ok.Value).ToList();
-        Assert.Equal(MarcasAutosSeed.Marcas.Count, marcas.Count);
-        Assert.Equal(
-            MarcasAutosSeed.Marcas.Select(m => m.Nombre).Order(),
-            marcas.Select(m => m.Nombre).Order());
-    }
-
-    [Fact]
-    public async Task GetAll_RetornaMarcasOrdenadasPorNombre()
-    {
-        await using var context = InMemoryDbContextFactory.Crear();
-        var controller = new MarcasAutosController(context);
+        var controller = new MarcasAutosController(new MarcasAutosService(context));
 
         var resultado = await controller.GetAll(CancellationToken.None);
 
         var marcas = ObtenerMarcas(resultado);
-        Assert.Equal(marcas.Select(m => m.Nombre).Order(), marcas.Select(m => m.Nombre));
+        Assert.Equal(
+            MarcasAutosSeed.Marcas.Select(m => m.Nombre).Order(),
+            marcas.Select(m => m.Nombre));
     }
 
     [Fact]
-    public async Task GetAll_MapeaTodosLosCamposDeLaEntidad()
+    public async Task GetAll_RetornaOkConLoQueEntregaElServicio()
     {
-        await using var context = InMemoryDbContextFactory.Crear(conSeed: false);
-        context.MarcasAutos.Add(new MarcaAuto
-        {
-            Id = 10,
-            Nombre = "Mazda",
-            PaisOrigen = "Japón",
-            AnioFundacion = 1920
-        });
-        await context.SaveChangesAsync();
-        var controller = new MarcasAutosController(context);
+        // Con el servicio simulado se prueba solo la responsabilidad del controlador:
+        // envolver el resultado en un 200 sin alterarlo.
+        IReadOnlyList<MarcaAutoDto> esperadas =
+        [
+            new(1, "Toyota", "Japón", 1937),
+            new(2, "Ford", "Estados Unidos", 1903),
+        ];
+        var service = Substitute.For<IMarcasAutosService>();
+        service.ObtenerTodasAsync(Arg.Any<CancellationToken>()).Returns(esperadas);
+        var controller = new MarcasAutosController(service);
 
         var resultado = await controller.GetAll(CancellationToken.None);
 
-        var marca = Assert.Single(ObtenerMarcas(resultado));
-        Assert.Equal(new MarcaAutoDto(10, "Mazda", "Japón", 1920), marca);
+        Assert.Equal(esperadas, ObtenerMarcas(resultado));
     }
 
     [Fact]
-    public async Task GetAll_SinRegistros_RetornaOkConListaVacia()
+    public async Task GetAll_SinMarcas_RetornaOkConListaVacia()
     {
-        await using var context = InMemoryDbContextFactory.Crear(conSeed: false);
-        var controller = new MarcasAutosController(context);
+        var service = Substitute.For<IMarcasAutosService>();
+        service.ObtenerTodasAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<MarcaAutoDto>());
+        var controller = new MarcasAutosController(service);
 
         var resultado = await controller.GetAll(CancellationToken.None);
 
         // Sin datos se espera 200 con lista vacía, no 404: la colección existe aunque esté vacía.
-        Assert.IsType<OkObjectResult>(resultado.Result);
         Assert.Empty(ObtenerMarcas(resultado));
     }
 
     [Fact]
-    public async Task GetAll_ConCancelacionSolicitada_LanzaOperationCanceledException()
+    public async Task GetAll_PropagaElCancellationTokenAlServicio()
     {
-        await using var context = InMemoryDbContextFactory.Crear();
-        var controller = new MarcasAutosController(context);
+        var service = Substitute.For<IMarcasAutosService>();
+        service.ObtenerTodasAsync(Arg.Any<CancellationToken>()).Returns(Array.Empty<MarcaAutoDto>());
+        var controller = new MarcasAutosController(service);
         using var cts = new CancellationTokenSource();
-        await cts.CancelAsync();
 
-        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => controller.GetAll(cts.Token));
+        await controller.GetAll(cts.Token);
+
+        // Si el cliente cancela la petición, la consulta a la base también debe cancelarse.
+        await service.Received(1).ObtenerTodasAsync(cts.Token);
     }
 
     private static List<MarcaAutoDto> ObtenerMarcas(ActionResult<IEnumerable<MarcaAutoDto>> resultado)

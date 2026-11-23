@@ -1,17 +1,17 @@
-using MarcasAutos.Api.Data;
 using MarcasAutos.Api.Dtos;
+using MarcasAutos.Api.Services;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 namespace MarcasAutos.Api.Controllers;
 
 /// <summary>
 /// Endpoints de consulta de marcas de autos.
+/// El controlador solo se ocupa de HTTP; el acceso a datos queda en el servicio.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
-public class MarcasAutosController(AppDbContext context) : ControllerBase
+public class MarcasAutosController(IMarcasAutosService marcasAutosService) : ControllerBase
 {
     /// <summary>
     /// Obtiene todas las marcas de autos ordenadas por nombre.
@@ -21,14 +21,7 @@ public class MarcasAutosController(AppDbContext context) : ControllerBase
     [ProducesResponseType<IEnumerable<MarcaAutoDto>>(StatusCodes.Status200OK)]
     public async Task<ActionResult<IEnumerable<MarcaAutoDto>>> GetAll(CancellationToken cancellationToken)
     {
-        // AsNoTracking: es solo lectura, no hace falta que EF siga los cambios de estas entidades.
-        // La proyección a DTO se traduce a SQL, así solo se consultan las columnas necesarias.
-        var marcas = await context.MarcasAutos
-            .AsNoTracking()
-            .OrderBy(m => m.Nombre)
-            .Select(m => new MarcaAutoDto(m.Id, m.Nombre, m.PaisOrigen, m.AnioFundacion))
-            .ToListAsync(cancellationToken);
-
+        var marcas = await marcasAutosService.ObtenerTodasAsync(cancellationToken);
         return Ok(marcas);
     }
 }

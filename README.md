@@ -8,7 +8,7 @@ y un entorno con Docker Compose.
 
 - .NET 10 / ASP.NET Core (controladores)
 - Entity Framework Core 10 + Npgsql (PostgreSQL)
-- xUnit, EF Core InMemory, coverlet y ReportGenerator
+- xUnit, EF Core InMemory, NSubstitute, coverlet y ReportGenerator
 - Docker y Docker Compose (PostgreSQL 17)
 
 ## Estructura
@@ -21,9 +21,11 @@ y un entorno con Docker Compose.
 │  ├─ Data/Migrations/                       Migración InitialCreate
 │  ├─ Dtos/MarcaAutoDto.cs                   Contrato de respuesta
 │  ├─ Models/MarcaAuto.cs                    Entidad
+│  ├─ Services/                              Lógica de consulta (IMarcasAutosService)
 │  └─ Program.cs                             Configuración y arranque
 ├─ tests/MarcasAutos.Api.Tests
 │  ├─ Controllers/                           Pruebas unitarias del controlador
+│  ├─ Services/                              Pruebas del servicio con contexto en memoria
 │  ├─ Data/                                  Pruebas del modelo y del seed
 │  ├─ Integration/                           API completa con WebApplicationFactory
 │  └─ Helpers/                               Fábrica del contexto en memoria
@@ -101,8 +103,11 @@ dotnet test
 Las pruebas no necesitan PostgreSQL: usan el proveedor InMemory de EF Core, con una base
 distinta por prueba para que no compartan estado.
 
-- **Unitarias del controlador**: devuelve 200 con todas las marcas, orden por nombre,
-  mapeo de campos al DTO, lista vacía sin registros y respeto de la cancelación.
+- **Servicio** (contexto en memoria): todas las marcas, orden por nombre, mapeo de campos
+  al DTO, lista vacía sin registros y respeto de la cancelación.
+- **Controlador**: con el servicio real sobre InMemory verifica que el endpoint devuelve las
+  marcas del seed; con el servicio simulado (NSubstitute) verifica de forma aislada que
+  responde 200 con lo que entrega el servicio y que propaga el `CancellationToken`.
 - **Modelo y seed**: al menos tres marcas, sin Id ni nombres repetidos, tabla `MarcasAutos`
   e índice único en `Nombre`.
 - **Integración**: levanta la API con `WebApplicationFactory` cambiando PostgreSQL por
@@ -122,7 +127,7 @@ dotnet tool restore
 dotnet reportgenerator -reports:"TestResults/*/coverage.cobertura.xml" -targetdir:coverage-report -reporttypes:"Html;TextSummary"
 ```
 
-El reporte queda en `coverage-report/index.html`. Cobertura actual: **95,8 % de líneas**
+El reporte queda en `coverage-report/index.html`. Cobertura actual: **95,9 % de líneas**
 y 80 % de ramas (objetivo mínimo: 70 %).
 
 Las migraciones se excluyen del cálculo porque las genera `dotnet ef` y no contienen
@@ -132,6 +137,10 @@ ejecutar `dotnet test`.
 
 ## Decisiones de diseño
 
+- **Capas**: `Controller → IMarcasAutosService → AppDbContext`. El controlador solo maneja
+  HTTP y depende de una interfaz; la consulta y el mapeo viven en el servicio.
+- **Sin repositorio propio**: `DbContext` ya implementa los patrones Repository (`DbSet`) y
+  Unit of Work; envolverlo en otro repositorio duplicaría su API sin beneficio en este alcance.
 - **Seed con `HasData`**: los datos quedan dentro de la migración, así crear la tabla y
   cargarla es un único paso versionado.
 - **Secuencia de identidad desde 6**: como el seed inserta Id explícitos (1 a 5), la

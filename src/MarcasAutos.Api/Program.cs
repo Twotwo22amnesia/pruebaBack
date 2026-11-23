@@ -1,5 +1,6 @@
 using MarcasAutos.Api.Data;
 using Microsoft.EntityFrameworkCore;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -34,7 +35,9 @@ if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true))
 
 if (app.Environment.IsDevelopment())
 {
+    // Documento OpenAPI en /openapi/v1.json y una interfaz para probar la API en /scalar.
     app.MapOpenApi();
+    app.MapScalarApiReference();
 }
 
 app.UseHttpsRedirection();

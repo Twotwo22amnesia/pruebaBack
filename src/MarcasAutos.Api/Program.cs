@@ -40,7 +40,12 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
-app.UseHttpsRedirection();
+// Dentro del contenedor la API solo expone HTTP (8080); el TLS, si hiciera falta, lo
+// resolvería un proxy delante. Redirigir ahí no tiene destino y solo genera advertencias.
+if (!app.Configuration.GetValue<bool>("DOTNET_RUNNING_IN_CONTAINER"))
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthorization();
 

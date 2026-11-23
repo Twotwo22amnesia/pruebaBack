@@ -35,7 +35,9 @@ services:
       # Development habilita la documentación interactiva en /scalar.
       ASPNETCORE_ENVIRONMENT: Development
       # El host es "db": el nombre del servicio, resuelto por la red interna de compose.
-      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-marcasautos};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+      # GSS Encryption Mode=Disable: no se usa Kerberos y así Npgsql no intenta cargar
+      # libgssapi (ausente en la imagen), lo que dejaba un error en el log al conectar.
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-marcasautos};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres};GSS Encryption Mode=Disable
     ports:
       - "8080:8080"
     depends_on:

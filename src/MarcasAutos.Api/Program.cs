@@ -18,6 +18,20 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+// Aplica las migraciones pendientes al iniciar (incluye la creación de la tabla y el seed).
+// Así basta con "docker compose up" para tener la base lista. En un entorno productivo
+// preferiría ejecutarlas como paso aparte del despliegue.
+// Solo aplica a bases relacionales: las pruebas usan InMemory, que no tiene migraciones.
+if (app.Configuration.GetValue("Database:ApplyMigrationsOnStartup", true))
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    if (db.Database.IsRelational())
+    {
+        db.Database.Migrate();
+    }
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

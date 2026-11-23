@@ -1,0 +1,10 @@
+**/bin/
+**/obj/
+**/TestResults/
+coverage-report/
+.git/
+.vs/
+.vscode/
+.idea/
+*.user
+.env

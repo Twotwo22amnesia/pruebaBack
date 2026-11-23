@@ -1,0 +1,57 @@
+# Entorno completo: PostgreSQL + API REST.
+#   docker compose up --build                      -> levanta base de datos y API
+#   docker compose --profile tests run --rm tests  -> ejecuta las pruebas en un contenedor
+#
+# Las credenciales tienen valores por defecto para desarrollo y pueden
+# sobrescribirse con un archivo .env (ver .env.example).
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: marcasautos-db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-marcasautos}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # La API depende de este chequeo: no arranca hasta que Postgres acepta conexiones,
+    # no solo hasta que el contenedor existe.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: final
+    container_name: marcasautos-api
+    environment:
+      # Development habilita la documentación interactiva en /scalar.
+      ASPNETCORE_ENVIRONMENT: Development
+      # El host es "db": el nombre del servicio, resuelto por la red interna de compose.
+      ConnectionStrings__DefaultConnection: Host=db;Port=5432;Database=${POSTGRES_DB:-marcasautos};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-postgres}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # Solo se levanta con --profile tests. Las pruebas usan InMemory, por lo que no
+  # necesitan la base de datos; los resultados y la cobertura quedan en ./TestResults.
+  tests:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test
+    profiles: ["tests"]
+    volumes:
+      - ./TestResults:/testresults
+
+volumes:
+  pgdata:
